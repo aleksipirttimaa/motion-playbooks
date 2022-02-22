@@ -1,0 +1,89 @@
+- name: Install dependecies
+  block:
+    - name: Package rsync is installed
+      ansible.builtin.package:
+        name: rsync
+        state: present
+    - name: Package motion is installed
+      ansible.builtin.package:
+        name: motion
+        state: present
+
+    - name: motion is enabled
+      ansible.builtin.systemd:
+        name: motion.service
+        enabled: true
+
+    - name: Script picture_save.sh is installed
+      ansible.builtin.copy:
+        src: usr/local/sbin/picture_save.sh
+        dest: /usr/local/sbin/picture_save.sh
+        mode: '0755'
+    - name: Script purge_old.sh is installed
+      ansible.builtin.copy:
+        src: usr/local/sbin/purge_old.sh
+        dest: /usr/local/sbin/purge_old.sh
+        mode: '0755'
+
+    - name: motion-purge-old.timer is installed
+      ansible.builtin.copy:
+        src: etc/systemd/system/motion-purge-old.timer
+        dest: /etc/systemd/system/motion-purge-old.timer
+      register: purge_timer
+    - name: motion-purge-old.service is installed
+      ansible.builtin.copy:
+        src: etc/systemd/system/motion-purge-old.service
+        dest: /etc/systemd/system/motion-purge-old.service
+      register: purge_service
+    - name: systemd is reloaded
+      ansible.builtin.systemd:
+        daemon-reload: yes
+      when: purge_timer.changed or purge_service.changed
+    - name: motion-purge-old.timer is enabled
+      ansible.builtin.systemd:
+        name: motion-purge-old.timer
+        enabled: yes
+        state: started
+  become: yes
+- name: Configure motion
+  block:
+    - name: Copy motion.conf
+      ansible.builtin.copy:
+        src: etc/motion/motion.conf
+        dest: /etc/motion/motion.conf
+      register: motion_conf
+
+    - name: Add cameras
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        line: 'camera /etc/motion/thread{{ index }}.conf'
+      loop: '{{ vars.cameras }}'
+      loop_control:
+        index_var: index
+      register: motion_cameras
+
+    - name: Copy camera files
+      ansible.builtin.template:
+        src: etc/motion/thread.j2
+        dest: '/etc/motion/thread{{ index }}.conf'
+      loop: '{{ vars.cameras }}'
+      loop_control:
+        index_var: index
+      register: motion_camera_files
+
+    - name: Create target_dirs for each camera
+      ansible.builtin.file:
+        path: '{{ vars.motion_target }}/{{ item.name }}'
+        state: directory
+        owner: motion
+        group: motion
+        mode: '0750'
+      loop: '{{ vars.cameras }}'
+
+    - name: Ensure configuration is loaded
+      ansible.builtin.systemd:
+        name: motion.service
+        state: reloaded
+      when: motion_conf.changed or motion_cameras.changed or
+        motion_camera_files.changed
+  become: yes

@@ -1,0 +1,4 @@
+{{ ansible_managed | comment }}
+
+target_dir {{ vars.motion_target }}/{{ item.name }}
+videodevice /dev/v4l/by-id/{{ item.usb_id }}

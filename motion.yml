@@ -1,0 +1,10 @@
+---
+- hosts:
+    - motion
+  roles:
+    - role: motion
+      vars:
+        - motion_target: '/var/motion_output'
+        - cameras:
+          # cameras have their own target_dir's distinguished by 'name'
+          - {name: "main-hall", usb_id: "usb-682d_0898_08BE338D-video-index0"}

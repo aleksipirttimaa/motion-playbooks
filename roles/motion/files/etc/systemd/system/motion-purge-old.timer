@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+
+[Unit]
+Description=Purge old photos automatically
+
+[Timer]
+OnBootSec=120min
+OnUnitActiveSec=12hours
+
+[Install]
+WantedBy=timers.target
